@@ -1,3 +1,4 @@
+hey were so back
 # AI SDK 5 Coding Agent Starter Project
 
 Starter project for Vercel Ship "Building agents with the AI SDK". This coding agent is built with AI SDK 5, Vercel AI Gateway, and Vercel Sandbox. It can read and modify GitHub repositories.
@@ -36,6 +37,7 @@ To create a GitHub Personal Access Token (PAT):
 
 ## Contributing
 
+<<<<<<< HEAD
 We welcome contributions to this project! To contribute, please follow these steps:
 
 1. Fork the repository.
@@ -45,6 +47,17 @@ We welcome contributions to this project! To contribute, please follow these ste
 5. Open a pull request to the main repository.
 
 Please ensure all tests pass and code is well-documented.
+=======
+Contributions are welcome! To contribute to this project, please follow these steps:
+
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature/your-feature-name`).
+3. Make your changes and commit them (`git commit -m 'Add some feature'`).
+4. Push to the branch (`git push origin feature/your-feature-name`).
+5. Open a pull request describing your changes.
+
+Please ensure your code follows the existing style and includes appropriate tests where applicable.
+>>>>>>> f3563b8eea34ce9a540185a73cc01a164e16170f
 
 ## Usage
 
