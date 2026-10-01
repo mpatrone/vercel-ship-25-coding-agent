@@ -1,14 +1,24 @@
 import { generateText, stepCountIs } from "ai";
 import {z} from "zod";
 import fs from 'node:fs';
+import { type Sandbox } from "@vercel/sandbox";
+import {
+  createPR,
+  createSandbox, 
+  editFile, 
+  listFiles, 
+  readFile, 
+} from "./sandbox"; 
 
-export async function codingAgent(prompt: string) {
+export async function codingAgent(prompt: string, repoUrl?: string) {
+  console.log("repoUrl:", repoUrl); 
+  let sandbox: Sandbox | undefined; 
+
   const result = await generateText({
     model: "openai/gpt-4.1-mini",
     prompt,
     system:
-      "You are a coding agent. You will be working with js/ts projects. Your responses must be concise." +
-      "Always start by listing all the files in the current directory and if necessary, list the",
+      "You are a coding agent. You will be working with js/ts projects. Your responses must be concise. If you make changes to the codebase, be sure to run the create_pr tool once you are done.", 
     stopWhen: stepCountIs(10),
     tools: { 
       list_files: { 
@@ -24,16 +34,14 @@ export async function codingAgent(prompt: string) {
             return { error: "You cannot read the path: ", generatedPath }; 
           } 
           const path = generatedPath?.trim() ? generatedPath : "."; 
-          try { 
-            console.log(`Listing files at '${path}'`); 
-            const output = fs.readdirSync(path, { 
-              recursive: false, 
-            }); 
-            return { path, output }; 
-          } catch (e) { 
-            console.error(`Error listing files:`, e); 
-            return { error: e }; 
-          } 
+          try {
+            if (!sandbox) sandbox = await createSandbox(repoUrl!); 
+            const output = await listFiles(sandbox, path); 
+            return { path, output };
+          } catch (e) {
+            console.error(`Error listing files:`, e);
+            return { error: e };
+          }
         }, 
       },
       read_file: { 
@@ -43,15 +51,15 @@ export async function codingAgent(prompt: string) {
             path: z.string().describe("The relative path of a file in the working directory."), 
           }), 
           execute: async ({ path }) => { 
-            try { 
-              console.log(`Reading file at '${path}'`); 
-              const output = fs.readFileSync(path, "utf-8"); 
-              return { path, output }; 
-            } catch (_e) { 
-              let error = _e as Error;
-              console.error(`Error reading file at ${path}:`, error.message); 
-              return { path, error: error.message }; 
-            } 
+            try {
+              if (!sandbox) sandbox = await createSandbox(repoUrl!); 
+              const output = await readFile(sandbox, path); 
+              return { path, output };
+            } catch (e) {
+              let error = e as Error;
+              console.error(`Error reading file at ${path}:`, error.message);
+              return { path, error: error.message };
+            }
           }, 
       },  
       edit_file: { 
@@ -65,26 +73,41 @@ export async function codingAgent(prompt: string) {
             new_str: z.string().describe("Text to replace old_str with"), 
           }), 
           execute: async ({ path, old_str, new_str }) => { 
-            try { 
-              const fileExists = fs.existsSync(path); 
-              if (fileExists && old_str !== null) { 
-                console.log(`Editing file '${path}'`); 
-                const fileContents = fs.readFileSync(path, "utf-8"); 
-                const newContents = fileContents.replace(old_str, new_str); 
-                fs.writeFileSync(path, newContents); 
-                return { path, success: true, action: "edit" }; 
-              } else { 
-                console.log(`Creating file '${path}'`); 
-                fs.writeFileSync(path, new_str); 
-                return { path, success: true, action: "create" }; 
-              } 
-            } catch (e) { 
-              console.error(`Error editing file ${path}:`, e); 
-              return { error: e, success: false }; 
-            } 
+            try {
+              if (!sandbox) sandbox = await createSandbox(repoUrl!); 
+              await editFile(sandbox, path, old_str, new_str); 
+              return { success: true };
+            } catch (e) {
+              console.error(`Error editing file ${path}:`, e);
+              return { error: e };
+            }
           }, 
-      },       
+      },   
+      create_pr: {
+        description:
+          "Create a pull request with the current changes. This will add all files, commit changes, push to a new branch, and create a PR using GitHub's REST API. Use this as the final step when making changes.", 
+        inputSchema: z.object({
+          title: z.string().describe("The title of the pull request"), 
+          body: z.string().describe("The body/description of the pull request"), 
+          branch: z.string().nullable().describe(
+              "The name of the branch to create (defaults to a generated name)", 
+            ), 
+        }), 
+        execute: async ({ title, body, branch }) => {
+          const { pr_url } = await createPR(sandbox!, repoUrl!, {
+            title, 
+            body, 
+            branch, 
+          }); 
+          return { success: true, linkToPR: pr_url }; 
+        }, 
+      },           
     }, 
   });
+
+  if (sandbox) {
+    await sandbox.stop(); 
+  } 
+
   return { response: result.text };
 }

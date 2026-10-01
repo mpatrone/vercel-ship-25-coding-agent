@@ -3,6 +3,9 @@ import dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
 
-codingAgent("Please add a contributing section in the README")
+codingAgent(
+    "Add a contributing section to the readme of this project. Use standard format.",
+    "https://github.com/mpatrone/vercel-ship-25-coding-agent",
+  )
   .then(console.log)
   .catch(console.error);
